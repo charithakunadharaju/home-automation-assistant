@@ -41,6 +41,28 @@ function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
+// Weather / Rain
+  if (command.includes('weather') || command.includes('rain')) {
+    try {
+      const cityMatch = command.match(/in\s+([a-zA-Z\s]+)/);
+      const city = cityMatch ? cityMatch[1].trim() : 'hyderabad';
+
+      const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${process.env.WEATHER_API_KEY}&units=metric`;
+      const response = await axios.get(url);
+
+      const weather = response.data.weather[0].description;
+      const temp = response.data.main.temp;
+
+      return res.json({
+        answer: `Current weather in ${capitalize(city)} is ${weather} with ${temp}°C`
+      });
+    } catch (error) {
+      return res.json({
+        answer: 'Unable to fetch weather details.'
+      });
+    }
+  }
+
 // Server start 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
