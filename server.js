@@ -2,10 +2,13 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
+const OpenAI = require('openai')
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const openai = new OpenAI({apiKey: process.env.OPENAI_API_KEY});
 
 // Main Api
 app.post('/api/assistant/command', async (req, res) => {
@@ -62,6 +65,28 @@ function capitalize(text) {
       });
     }
   }
+
+  //For random Questions
+  try{
+    const aiResponse = await openai.chat.completions.create({
+      model:
+      messages:[{
+        role: 'system',content:'You are a helpful voice assistant.'},
+        {role:'user',content:command}
+      ]
+  });
+  return res.json({
+    answer: aiResponse.choices[0].message.content
+  });
+}catch(error){
+  return res.json({
+    answer:'AI service is currently unavailable.'
+  });
+}
+
+function capitalize(text){
+  return text.charAt(0).toUpperCase()+TextTrack.slice(1);
+}
 
 // Server start 
 const PORT = process.env.PORT || 5000;
