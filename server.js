@@ -2,51 +2,45 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const cors = require('cors');
-const OpenAI = require('openai');
+const TelegramBot = require('node-telegram-bot-api');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// OpenAI client (if key exists)
-let openaiClient = null;
-if (process.env.OPENAI_API_KEY) {
-  openaiClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+//TELEGRAM BOT SETUP
+
+if (!process.env.TELEGRAM_BOT_TOKEN) {
+  console.error('TELEGRAM_BOT_TOKEN is missing');
+  process.exit(1);
 }
 
-// ONE SINGLE API
-app.post('/api/assistant/command', async (req, res) => {
-  const command = req.body.command?.toLowerCase();
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN, {
+  polling: true
+});
 
-  if (!command) {
-    return res.status(400).json({ error: 'Command is required' });
-  }
+//CORE ANSWER FUNCTION
+async function getAnswer(command) {
+  const text = command.toLowerCase();
 
-  
   // TIME
-  if (command.includes('time')) {
-    return res.json({
-      answer: `Current time is ${new Date().toLocaleTimeString()}`
-    });
+  if (text.includes('time')) {
+    return `Current time is ${new Date().toLocaleTimeString()}`;
   }
 
   // DATE
-  
-  if (command.includes('date')) {
-    return res.json({
-      answer: `Today's date is ${new Date().toDateString()}`
-    });
+  if (text.includes('date')) {
+    return `Today's date is ${new Date().toDateString()}`;
   }
 
   // WEATHER
- 
-  if (command.includes('weather') || command.includes('rain')) {
+  if (text.includes('weather') || text.includes('rain')) {
     if (!process.env.WEATHER_API_KEY) {
-      return res.json({ answer: 'Weather service not configured.' });
+      return 'Weather service is not configured.';
     }
 
     try {
-      const cityMatch = command.match(/in\s+([a-zA-Z\s]+)/);
+      const cityMatch = text.match(/in\s+([a-zA-Z\s]+)/);
       const city = cityMatch ? cityMatch[1].trim() : 'hyderabad';
 
       const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${process.env.WEATHER_API_KEY}&units=metric`;
@@ -55,66 +49,51 @@ app.post('/api/assistant/command', async (req, res) => {
       const weather = response.data.weather[0].description;
       const temp = response.data.main.temp;
 
-      return res.json({
-        answer: `Current weather in ${capitalize(city)} is ${weather} with ${temp}°C`
-      });
-    } catch (error) {
-      return res.json({
-        answer: 'Unable to fetch weather details right now.'
-      });
+      return `Current weather in ${capitalize(city)} is ${weather} with ${temp}°C`;
+    } catch {
+      return 'Unable to fetch weather details right now.';
     }
   }
 
- 
-  // PREDEFINED FREE ANSWERS (WORK WITHOUT OPENAI)
-  
-  const predefinedAnswers = {
-    "who are you": "I am your smart automation assistant.",
-    "what is nodejs": "Node.js is a JavaScript runtime built on Chrome's V8 engine.",
-    "what is javascript": "JavaScript is a programming language used for web development.",
-    "what is mongodb": "MongoDB is a NoSQL document-based database."
-  };
+  // FALLBACK
+  return "I can help with time, date, and weather. More features coming soon.";
+}
 
-  if (predefinedAnswers[command]) {
-    return res.json({ answer: predefinedAnswers[command] });
-  }
 
-  
-  // RANDOM QUESTIONS USING OPENAI
+//RESTAPI
+app.post('/api/assistant/command', async (req, res) => {
+  const command = req.body.command;
 
-  if (!openaiClient) {
-    return res.json({
-      answer: "I can answer time, date, and weather. AI service is not enabled."
+  if (!command) {
+    return res.status(400).json({
+      answer: 'Command is required'
     });
   }
 
-  try {
-    const aiResponse = await openaiClient.responses.create({
-      model: 'gpt-4o-mini',
-      input: command
-    });
-
-    return res.json({
-      answer: aiResponse.output_text
-    });
-  } catch (error) {
-    console.error("OPENAI ERROR:", error.response?.data || error.message);
-    return res.json({
-      answer: "Sorry, I couldn't answer that right now."
-    });
-  }
+  const answer = await getAnswer(command);
+  return res.json({ answer });
 });
 
 
-// HELPER FUNCTION
+//TELEGRAM BOT HANDLER
+bot.on('message', async (msg) => {
+  const chatId = msg.chat.id;
+  const text = msg.text;
+if (!text) return;
+const answer = await getAnswer(text);
+  bot.sendMessage(chatId, answer);
+});
+
+
+//HELPER
 function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-// START SERVER
+// SERVER START
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`✅ Smart Assistant running on port ${PORT}`);
-  console.log("Weather Key loaded:", !!process.env.WEATHER_API_KEY);
-  console.log("OpenAI Key loaded:", !!process.env.OPENAI_API_KEY);
+  console.log(`Smart Assistant running on port ${PORT}`);
+  console.log('Telegram Bot running...');
+  console.log('Weather Key loaded:', !!process.env.WEATHER_API_KEY);
 });
