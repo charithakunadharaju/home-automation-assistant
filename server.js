@@ -56,7 +56,7 @@ async function getAnswer(command) {
   }
 
   // FALLBACK
-  return "I can help with time, date, and weather. More features coming soon.";
+  return "I can help with time, date, and weather. More features to add.";
 }
 
 
